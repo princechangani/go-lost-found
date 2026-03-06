@@ -11,7 +11,7 @@ import (
 var FirebaseApp *firebase.App
 
 func InitFirebase() {
-	opt := option.WithCredentialsFile("serviceAccountKey.json")
+	opt := option.WithCredentialsFile("internal/config/serviceAccountKey.json")
 
 	app, err := firebase.NewApp(context.Background(), nil, opt)
 	if err != nil {

@@ -2,13 +2,14 @@ package handler
 
 import (
 	"fmt"
-	"github.com/gofiber/fiber/v2"
 	"go-lost-found/internal/models"
 	"go-lost-found/internal/repository"
 	services "go-lost-found/internal/service"
 	"log"
 	"strconv"
 	"time"
+
+	"github.com/gofiber/fiber/v2"
 )
 
 func GetItems(c *fiber.Ctx) error {
@@ -83,8 +84,8 @@ func CreateItems(c *fiber.Ctx) error {
 		item.Status = status
 	}
 
-	// Handle image file
-	file, err := c.FormFile("image")
+	// Handle image file — key must match frontend: formData.append("file", file)
+	file, err := c.FormFile("file")
 	if err == nil {
 		// Save file or upload to cloud
 		fileName := fmt.Sprintf("uploads/%d_%s", time.Now().Unix(), file.Filename)
@@ -105,32 +106,26 @@ func CreateItems(c *fiber.Ctx) error {
 	users := []models.User{}
 	users, err = repository.GetUsers()
 	if err != nil {
-		return c.Status(500).JSON(fiber.Map{
-			"status":  false,
-			"message": "Failed to get users: " + err.Error(),
-		})
-	}
-	fcmTokens := []string{}
-
-	if users != nil {
-
+		log.Printf("Warning: failed to get users for notification: %v", err)
+	} else {
+		fcmTokens := []string{}
 		for _, user := range users {
-			fcmTokens = append(fcmTokens, user.FcmToken)
+			if user.FcmToken != "" {
+				fcmTokens = append(fcmTokens, user.FcmToken)
+			}
+		}
+		if len(fcmTokens) > 0 {
+			if notifErr := services.SendMultiNotification(fcmTokens, "Lost Found", "New item added", createdItem.Image); notifErr != nil {
+				log.Printf("Warning: failed to send notifications: %v", notifErr)
+			}
 		}
 	}
 
-	err = services.SendMultiNotification(fcmTokens, "Lost Found", "New item added", createdItem.Image)
-	if err != nil {
-		return c.Status(500).JSON(fiber.Map{
-			"status":  false,
-			"message": "Failed to send notification: " + err.Error(),
-		})
-	}
-
 	return c.Status(201).JSON(fiber.Map{
-		"status":  true,
-		"message": "Item created successfully",
-		"data":    createdItem,
+		"status":     true,
+		"statusCode": "201",
+		"message":    "Item created successfully",
+		"data":       createdItem,
 	})
 }
 

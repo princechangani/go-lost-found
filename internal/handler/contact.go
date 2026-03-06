@@ -2,6 +2,8 @@ package handler
 
 import (
 	"fmt"
+	"strings"
+
 	"github.com/gofiber/fiber/v2"
 	"go-lost-found/internal/models"
 	"go-lost-found/internal/repository"
@@ -20,25 +22,36 @@ func NewHandler(emailService *services.EmailService) *Handler {
 func (h *Handler) CreateContact(c *fiber.Ctx) error {
 	var contact models.Contact
 	if err := c.BodyParser(&contact); err != nil {
-		return err
-	}
-
-	if err := repository.CreateContact(&contact); err != nil {
-		return err
-	}
-
-	var item models.LostFoundItem
-
-	item, err := repository.GetItemsByID(contact.ItemID)
-	if err != nil {
-		return c.Status(500).JSON(fiber.Map{
-			"status":  false,
-			"message": err.Error(),
+		return c.Status(fiber.StatusBadRequest).JSON(fiber.Map{
+			"status":     false,
+			"statusCode": "400",
+			"message":    "Invalid request body: " + err.Error(),
+			"data":       nil,
 		})
 	}
 
-	if item.Type == "Lost" {
-		item.Type = "Found"
+	// Validate item exists BEFORE saving contact to avoid orphan records
+	item, err := repository.GetItemsByID(contact.ItemID)
+	if err != nil {
+		return c.Status(fiber.StatusNotFound).JSON(fiber.Map{
+			"status":     false,
+			"statusCode": "404",
+			"message":    "Item not found: " + err.Error(),
+			"data":       nil,
+		})
+	}
+
+	if err := repository.CreateContact(&contact); err != nil {
+		return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{
+			"status":     false,
+			"statusCode": "500",
+			"message":    "Failed to save contact: " + err.Error(),
+			"data":       nil,
+		})
+	}
+
+	if strings.EqualFold(item.Type, "lost") {
+		item.Type = "found"
 		body := fmt.Sprintf(`
 	<h3>Your item has been found!</h3>
 	<p>You can reach the finder at: <b>%s</b></p>`, contact.Email)
@@ -66,7 +79,7 @@ func (h *Handler) CreateContact(c *fiber.Ctx) error {
 			})
 		}
 	} else {
-		item.Type = "Claimed"
+		item.Type = "claimed"
 		body := fmt.Sprintf(`
 	<h3>The Item you found has been claimed!</h3>
 	<p>You can reach the finder at: <b>%s</b></p>`, contact.Email)
@@ -104,53 +117,93 @@ func (h *Handler) CreateContact(c *fiber.Ctx) error {
 		})
 	}
 
-	return c.JSON(contact)
+	return c.Status(fiber.StatusCreated).JSON(fiber.Map{
+		"status":     true,
+		"statusCode": "201",
+		"message":    "Contact created successfully",
+		"data":       contact,
+	})
 }
 
 func GetContacts(c *fiber.Ctx) error {
 	contacts, err := repository.GetContacts()
 	if err != nil {
-		return err
+		return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{
+			"status":     false,
+			"statusCode": "500",
+			"message":    "Failed to get contacts: " + err.Error(),
+			"data":       nil,
+		})
 	}
-
-	return c.JSON(contacts)
+	return c.Status(fiber.StatusOK).JSON(fiber.Map{
+		"status":     true,
+		"statusCode": "200",
+		"message":    "Contacts retrieved successfully",
+		"data":       contacts,
+	})
 }
 
 func GetContactById(c *fiber.Ctx) error {
 	id := c.Params("id")
 	contact, err := repository.GetContactById(id)
 	if err != nil {
-		return err
+		return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{
+			"status":     false,
+			"statusCode": "500",
+			"message":    "Failed to get contact: " + err.Error(),
+			"data":       nil,
+		})
 	}
-
-	return c.JSON(contact)
+	return c.Status(fiber.StatusOK).JSON(fiber.Map{
+		"status":     true,
+		"statusCode": "200",
+		"message":    "Contact retrieved successfully",
+		"data":       contact,
+	})
 }
 
 func UpdateContact(c *fiber.Ctx) error {
 	id := c.Params("id")
 	var contact models.Contact
 	if err := c.BodyParser(&contact); err != nil {
-		return err
+		return c.Status(fiber.StatusBadRequest).JSON(fiber.Map{
+			"status":     false,
+			"statusCode": "400",
+			"message":    "Invalid request body: " + err.Error(),
+			"data":       nil,
+		})
 	}
-
 	contact.ID = id
-	err := repository.CreateContact(&contact)
-	if err != nil {
-		return err
+	if err := repository.UpdateContact(&contact); err != nil {
+		return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{
+			"status":     false,
+			"statusCode": "500",
+			"message":    "Failed to update contact: " + err.Error(),
+			"data":       nil,
+		})
 	}
-
-	return c.JSON(contact)
-
-	return c.JSON(contact)
+	return c.Status(fiber.StatusOK).JSON(fiber.Map{
+		"status":     true,
+		"statusCode": "200",
+		"message":    "Contact updated successfully",
+		"data":       contact,
+	})
 }
 
 func DeleteContact(c *fiber.Ctx) error {
 	id := c.Params("id")
 	if err := repository.DeleteContact(id); err != nil {
-		return err
+		return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{
+			"status":     false,
+			"statusCode": "500",
+			"message":    "Failed to delete contact: " + err.Error(),
+			"data":       nil,
+		})
 	}
-
-	return c.JSON(fiber.Map{
-		"message": "Contact deleted successfully",
+	return c.Status(fiber.StatusOK).JSON(fiber.Map{
+		"status":     true,
+		"statusCode": "200",
+		"message":    "Contact deleted successfully",
+		"data":       nil,
 	})
 }

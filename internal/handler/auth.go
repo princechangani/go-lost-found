@@ -1,10 +1,11 @@
 package handler
 
 import (
-	"github.com/gofiber/fiber/v2"
 	"go-lost-found/internal/models"
 	"go-lost-found/internal/repository"
 	"go-lost-found/internal/utils"
+
+	"github.com/gofiber/fiber/v2"
 	"golang.org/x/crypto/bcrypt"
 )
 
@@ -13,6 +14,11 @@ type RegisterRequest struct {
 	Password string `json:"password" validate:"required,min=6"`
 	Role     string `json:"role" validate:"required,oneof=user admin"`
 	FcmToken string `json:"fcmToken" validate:"required"`
+}
+
+type LoginRequest struct {
+	Email    string `json:"email" validate:"required,email"`
+	Password string `json:"password" validate:"required,min=6"`
 }
 
 func Register(c *fiber.Ctx) error {
@@ -58,7 +64,7 @@ func Register(c *fiber.Ctx) error {
 			})
 	}
 
-	user := models.NewUser(req.Email, string(hashed), req.Role)
+	user := models.NewUser(req.Email, string(hashed), req.Role, req.FcmToken)
 
 	if err := repository.CreateUser(user); err != nil {
 		return c.Status(fiber.StatusInternalServerError).JSON(
@@ -80,12 +86,14 @@ func Register(c *fiber.Ctx) error {
 }
 
 func Login(c *fiber.Ctx) error {
-	var req RegisterRequest
+	var req LoginRequest
 
 	if err := c.BodyParser(&req); err != nil {
 		return c.Status(fiber.StatusBadRequest).JSON(fiber.Map{
-			"success": false,
-			"message": "Invalid request body",
+			"status":     false,
+			"statusCode": "400",
+			"message":    "Invalid request body: " + err.Error(),
+			"data":       nil,
 		})
 	}
 
@@ -141,12 +149,13 @@ func Login(c *fiber.Ctx) error {
 			})
 	}
 	user.BearerToken = token
+	user.Password = "" // hide password before sending
 
 	return c.Status(fiber.StatusOK).JSON(fiber.Map{
 		"status":     true,
 		"statusCode": "200",
 		"message":    "User logged in successfully",
-		"data":       user,
+		"User":       user,
 	})
 
 }

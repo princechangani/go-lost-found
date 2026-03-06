@@ -1,9 +1,10 @@
 package handler
 
 import (
-	"github.com/gofiber/fiber/v2"
 	"go-lost-found/internal/models"
 	"go-lost-found/internal/repository"
+
+	"github.com/gofiber/fiber/v2"
 )
 
 func GetCategories(c *fiber.Ctx) error {
@@ -100,19 +101,14 @@ func UpdateCategory(c *fiber.Ctx) error {
 	var category models.Category
 	if err := c.BodyParser(&category); err != nil {
 		return c.Status(fiber.StatusBadRequest).JSON(fiber.Map{
-			"success": false,
-			"message": "Invalid request body",
+			"status":     false,
+			"statusCode": "400",
+			"message":    "Invalid request body: " + err.Error(),
+			"data":       nil,
 		})
 	}
-	category, err := repository.GetCategoryById(id)
-	if err != nil {
-		return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{
-			"success": false,
-			"message": "Failed to get category",
-		})
-	}
-
-	category, err = repository.SaveCategory(category)
+	category.ID = id
+	updated, err := repository.UpdateCategory(id, category)
 	if err != nil {
 		return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{
 			"status":     false,
@@ -125,7 +121,7 @@ func UpdateCategory(c *fiber.Ctx) error {
 		"status":     true,
 		"statusCode": "200",
 		"message":    "Category updated successfully",
-		"data":       category,
+		"data":       updated,
 	})
 }
 

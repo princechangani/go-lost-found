@@ -1,8 +1,9 @@
 package models
 
 import (
-	"go.mongodb.org/mongo-driver/bson/primitive"
 	"time"
+
+	"go.mongodb.org/mongo-driver/bson/primitive"
 )
 
 type Category struct {
@@ -64,13 +65,14 @@ type User struct {
 	UpdatedAt   time.Time `bson:"updatedAt" json:"updatedAt"`
 }
 
-func NewUser(email, password, role string) User {
+func NewUser(email, password, role, fcmToken string) User {
 	return User{
-		ID:        primitive.NewObjectID().String(),
+		ID:        primitive.NewObjectID().Hex(),
 		Email:     email,
 		Password:  password,
 		Role:      role,
 		Status:    1,
+		FcmToken:  fcmToken,
 		CreatedAt: time.Now(),
 		UpdatedAt: time.Now(),
 	}

@@ -35,8 +35,13 @@ func GetItemsByID(id string) (models.LostFoundItem, error) {
 	ctx, cancel := context.WithTimeout(context.Background(), 15*time.Second)
 	defer cancel()
 
+	oid, err := primitive.ObjectIDFromHex(id)
+	if err != nil {
+		return models.LostFoundItem{}, err
+	}
+
 	var item models.LostFoundItem
-	err := collection.FindOne(ctx, bson.M{"_id": id}).Decode(&item)
+	err = collection.FindOne(ctx, bson.M{"_id": oid}).Decode(&item)
 	return item, err
 
 }
@@ -51,7 +56,7 @@ func CreateItems(item models.LostFoundItem) (models.LostFoundItem, error) {
 		return models.LostFoundItem{}, err
 	}
 	if oid, ok := result.InsertedID.(primitive.ObjectID); ok {
-		item.ID = oid.String()
+		item.ID = oid.Hex()
 	}
 
 	return item, err
@@ -63,7 +68,12 @@ func UpdateItems(id string, item models.LostFoundItem) (models.LostFoundItem, er
 	ctx, cancel := context.WithTimeout(context.Background(), 15*time.Second)
 	defer cancel()
 
-	_, err := collection.UpdateOne(ctx, bson.M{"_id": id}, bson.M{"$set": item})
+	oid, err := primitive.ObjectIDFromHex(id)
+	if err != nil {
+		return models.LostFoundItem{}, err
+	}
+
+	_, err = collection.UpdateOne(ctx, bson.M{"_id": oid}, bson.M{"$set": item})
 	return item, err
 
 }
@@ -73,7 +83,12 @@ func DeleteItems(id string) error {
 	ctx, cancel := context.WithTimeout(context.Background(), 15*time.Second)
 	defer cancel()
 
-	_, err := collection.DeleteOne(ctx, bson.M{"_id": id})
+	oid, err := primitive.ObjectIDFromHex(id)
+	if err != nil {
+		return err
+	}
+
+	_, err = collection.DeleteOne(ctx, bson.M{"_id": oid})
 	return err
 
 }

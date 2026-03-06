@@ -4,8 +4,10 @@ import (
 	"context"
 	"go-lost-found/internal/database"
 	"go-lost-found/internal/models"
-	"go.mongodb.org/mongo-driver/bson"
 	"time"
+
+	"go.mongodb.org/mongo-driver/bson"
+	"go.mongodb.org/mongo-driver/bson/primitive"
 )
 
 func SaveNotification(notification models.Notification) error {
@@ -37,15 +39,19 @@ func SaveNotifications(notifications []models.Notification) error {
 
 }
 
-func GetNotificationByID(id string) error {
+func GetNotificationByID(id string) (models.Notification, error) {
 	collection := database.GetCollection("lost_found_item_db", "notification")
 	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
 	defer cancel()
 
-	var notification models.Notification
-	err := collection.FindOne(ctx, bson.M{"_id": id}).Decode(&notification)
-	return err
+	oid, err := primitive.ObjectIDFromHex(id)
+	if err != nil {
+		return models.Notification{}, err
+	}
 
+	var notification models.Notification
+	err = collection.FindOne(ctx, bson.M{"_id": oid}).Decode(&notification)
+	return notification, err
 }
 
 func GetNotifications() ([]models.Notification, error) {
