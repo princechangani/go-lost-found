@@ -11,6 +11,12 @@ export default defineConfig({
     watch: {
       usePolling: true,
       interval: 100
+    },
+    proxy: {
+      '/uploads': {
+        target: 'http://64.227.188.24:8090',
+        changeOrigin: true,
+      }
     }
   },
   resolve: {
